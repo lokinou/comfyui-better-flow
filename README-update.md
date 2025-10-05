@@ -1,4 +1,4 @@
-# Updating the model
+# Updating the model for the comfyui registry
 
 Decide of version name, don't forget changelog and dependencies if required
 Update:
@@ -13,4 +13,5 @@ git add commit and push
 check on [comfy registry](https://docs.comfy.org/registry/publishing)
 
 ### miniconda
-```comfyui publish``` use the secret key
+with comfy installed
+```comfy node publish``` use the secret key
