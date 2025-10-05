@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-offload-models"
+description = "Custom nodes to offload and rapatriate models from cpu."
+version = "1.1.0"
+license = { text = "MIT License" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/lokinou/comfyui-offload-models"
+
+[tool.comfy]
+PublisherId = "lokinou"
+DisplayName = "ComfyUI-Offload-Models"
+Icon = ""
