@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import re
 from .common import any_type, c_R, c_Y, c_B, c_G, c_P, c_0, CACHE_DIR, get_cache_path
+import numpy as np
 
 
 CLASS_STR = f"{c_B}CacheAny{c_0}"
@@ -31,10 +32,10 @@ class CacheAny:
     def IS_CHANGED(cls, any_to_cache, any_key, cache_name, force_recreate, *args, **kwargs):
         if force_recreate:
             return float("NaN")
-        cache_path = get_cache_path(any_key, cache_name, verbose=True)
-        print(f"{CLASS_STR}-{cache_name} is_changed={cache_path}")
-        if not cache_path.exists():
+        cache_path = get_cache_path(any_key, cache_name, ignore_errors=True)
+        if cache_path is None or not cache_path.exists():
             return float("NaN")
+        print(f"{CLASS_STR}-{cache_name} is_changed={cache_path}")
         return str(cache_path)
 
     @classmethod
@@ -52,23 +53,25 @@ class CacheAny:
     def run_caching(cls, any_to_cache, any_key, cache_name, cleanup_on_mismatch, force_recreate, *args, **kwargs):
         if any_key is None:
             raise TypeError(f"Nonetype error for any_key input")
-        if not isinstance(any_key, str):
-            raise TypeError(f"any_key must be a string, got {type(any_key)} instead")
-        if len(any_key) == 0:
-            raise ValueError(f"any_key must be at least 1 character")
-        if any_key.stem.find("+") >= 0:
-            raise ValueError(f"Please do not use the character '+' in they key={any_key}")
+        if cache_name is None:
+            raise TypeError(f"Nonetype error for cache_name input")
+        if not isinstance(cache_name, str):
+            raise TypeError(f"any_key must be a string, got {type(cache_name)} instead")
+        if len(cache_name) == 0:
+            raise ValueError(f"cache_name must be at least 1 character")
+        if cache_name.find("+") >= 0:
+            raise ValueError(f"Please do not use the character '+' in they cache_name={cache_name}")
         
         os.makedirs(CACHE_DIR, exist_ok=True)
-        cache_path = get_cache_path(any_key, cache_name)
+        cache_path = get_cache_path(any_key, cache_name, verbose=True)
 
-        current_hash = re.match(rf'{re.escape(any_key)}+([a-fA-F0-9]{{32}})\.pkl$',str(cache_path))
+        current_hash = re.match(rf'{re.escape(cache_name)}+([a-fA-F0-9]{{32}})\.pkl$',str(cache_path))
         parent_folder = cache_path.parent
         if cleanup_on_mismatch:
             # Search for other files with same key but different hash
             other_versions = []
-            for file in parent_folder.glob(f"{any_key}+*.pkl"):
-                file_match = re.match(rf"{re.escape(any_key)}+([a-fA-F0-9]{{32}})\.pkl", file.name)
+            for file in parent_folder.glob(f"{cache_name}+*.pkl"):
+                file_match = re.match(rf"{re.escape(cache_name)}+([a-fA-F0-9]{{32}})\.pkl", file.name)
                 if file_match:
                     file_hash = file_match.group(1)
                     if file_hash != current_hash:

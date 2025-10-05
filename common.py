@@ -4,6 +4,7 @@ import pickle
 import hashlib
 import os
 import torch
+import numpy as np
 
 # Contains common utilities and constants used by multiple nodes.
 
@@ -52,16 +53,20 @@ def get_hash_from_list_any(list_of_any):
     return get_hash_from_any(list_obj_bytes)
 
 
-def get_cache_path(any_key, cache_name, verbose=False) -> Path:
+def get_cache_path(any_key, cache_name, verbose=False, ignore_errors=False) -> Path:
 
     if isinstance(any_key, list):
         valid_keys = [item for item in any_key if item is not None]
         if len(valid_keys) < len(any_key):
-            return ValueError(f'Found a None value in the list of input keys, Cache name={cache_name}')
+            if ignore_errors:
+                return None
+            raise ValueError(f'Found a None value in the list of input keys, Cache name={cache_name}')
         md5_hash = get_hash_from_list_any(any_key)
     else:
         if any_key is None:
-            return ValueError(f'Cannot provide a cache file for an input key=None. Cache name={cache_name}')
+            if ignore_errors:
+                return None
+            raise ValueError(f'Cannot provide a cache file for an input key=None. Cache name={cache_name}')
         md5_hash = get_hash_from_any(any_key)
 
     # compose the file name from the cache name and the md5 hash

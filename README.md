@@ -58,6 +58,10 @@ cd ./ComfyUI/custom_nodes
 git clone https://github.com/lokinou/comfyui-better-flow.git
 ```
 
-## version 0.1
-- initial release from all node
-- migrated here ([comfyui-offload-models 1.1.0](https://github.com/lokinou/comfyui-offload-models))
+## versions
+
+- 0.1.1
+    - bug fixes
+- 0.1.0
+    - initial release from all node
+    - migrated here ([comfyui-offload-models 1.1.0](https://github.com/lokinou/comfyui-offload-models))
