@@ -3,6 +3,8 @@
 Nodes for controlling workflow and reducing VRAM fingerprint.
 All assembled for ComfyUI for the goal of making workflows easier and spare computing space. 
 
+***TODO: untested release***
+
 ***TODO: add image use cases for each custom node***
 
 ## Custom Nodes
@@ -41,6 +43,20 @@ Wait multiple triggers at once, the node dynamically adds new inputs for each ne
 
 ### Reroute Triggerable
 Reroute that can be triggered using the advanced Mode>OnTrigger UI elements. For advanced 
+
+## Install
+
+### Via ComfyUI
+
+Search for "comfyui-better-flow" in the available node, or paste the github repo link to install from it. 
+
+### Manual Install
+```sh
+# Go to the custom nodes
+cd ./ComfyUI/custom_nodes
+# Install the repo
+git clone https://github.com/lokinou/comfyui-better-flow.git
+```
 
 ## version 0.1
 - initial release from all node
