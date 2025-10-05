@@ -1,14 +1,14 @@
 [project]
-name = "comfyui-offload-models"
-description = "Custom nodes to offload and rapatriate models from cpu."
-version = "1.1.0"
+name = "comfyui-better-flow"
+description = "Nodes for controlling workflow and reducing VRAM fingerprint."
+version = "0.1.0"
 license = { text = "MIT License" }
 dependencies = []
 
 [project.urls]
-Repository = "https://github.com/lokinou/comfyui-offload-models"
+Repository = "https://github.com/lokinou/comfyui-better-flow"
 
 [tool.comfy]
 PublisherId = "lokinou"
-DisplayName = "ComfyUI-Offload-Models"
+DisplayName = "ComfyUI-Better-Flow"
 Icon = ""
