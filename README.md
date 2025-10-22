@@ -8,7 +8,6 @@ All assembled for ComfyUI for the goal of making workflows easier and spare comp
 	- fixed for GGUF flux model by unpatching the model (ModelPatcher and GGUFModelPatcher)
       - overrides the patch_on_device property
 
-***open topics***
 
 ***TODO: untested release***
 - offload/recall not tested on low_vram and high_vram flags and other models besides flux
@@ -41,16 +40,32 @@ Same as any to Hash but combines two individual hashes.
 It re-hashes the concatenation of the md5 hash of each input
 
 ###  Cache any
-saves the input to cache into a .pkl file, referenced with 
+For caching/ignoring time consuming steps in a workflow.
+
+This node saves new input into a .pkl file, referenced by
 - a key name
 - a hash calculated by its input
-During the next execution, if a matching key+hash is found in cache, it will Skips the heavy computing and return the pickled value instead.
+During the next execution, if a matching name+hash is found it will skip the heavy computing and return the pickled value instead.
 
-Multiple inputs keys can be used when combined with "any to hash x2" (for example 2 images + 1 prompt)
+> [!Tip ]Multiple inputs keys can be used when combined with "any to hash x2" (e.g. image + text)
 
+```
+Checks whether the name+key exists:
+- NO: 
+	- requests the any_to_cache input
+	- write cache file
+	- returns input
+- YES:
+	- ignores input
+	- reads from cache file
+	- returns from cached file
+- Finally
+	- deletes other cached files in the `output/cached_outputs` folder (todo: fix it)
+```
 ![example cache any](./resources/cache_any.png)
 
-Known issue: Tensor type objects seem to produce unreliable hashes. I put a fix for images but some data types must dealt with (e.g. Conditionnings)
+Known issues:
+- Tensor type objects seem to produce unreliable hashes. I put a fix for images but some data types must dealt with (e.g. Conditionnings)
 
 ### Experimental nodes (not even tested)
 
