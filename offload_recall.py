@@ -227,6 +227,7 @@ def is_supported(model_candidate, on_error: str = "raise") -> Tuple[bool, str]:
 
     # Then by default check for supported models
     if type(model_candidate) == ModelPatcher:
+        logging.info(f"- model of type {model_candidate.__class__.__name__}")
         return True, ''
     elif issubclass(type(model_candidate), ModelPatcher):
         logging.info(f"- model of type {model_candidate.__class__.__name__}, a subclass of ModelPatcher, it might not be supported for Offload/recall")

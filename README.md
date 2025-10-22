@@ -28,6 +28,7 @@ For finer control of VRAM use.
 Works for flux  via gguf model and .safetensor model, regardless of the low_vram flag (when calling ComfyUI) or the load_on_device property (from GGUFModelPatcher)
 Nunchaku is unsupported/ignored since it mangages its own VRAM usage outside python.
 
+![example offload and recall](./resources/offload_recall.png)
 
 ###  Any to Hash
 returns a md5 hash for the input object.
@@ -47,6 +48,8 @@ During the next execution, if a matching key+hash is found in cache, it will Ski
 
 Multiple inputs keys can be used when combined with "any to hash x2" (for example 2 images + 1 prompt)
 
+![example cache any](./resources/cache_any.png)
+
 Known issue: Tensor type objects seem to produce unreliable hashes. I put a fix for images but some data types must dealt with (e.g. Conditionnings)
 
 ### Experimental nodes (not even tested)
@@ -62,7 +65,7 @@ Reroute that can be triggered using the advanced Mode>OnTrigger UI elements. It 
 
 ## Install
 
-Don't forget to remove the `comfyui-offload-models`, it only workds on the `.safetensor` models.
+Don't forget to remove the `comfyui-offload-models` (because it only works on the `.safetensor` models, and can be confusing).
 
 ### Via ComfyUI
 
