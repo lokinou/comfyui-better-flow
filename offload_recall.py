@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import torch
 import gc
 import logging
+from nunchaku import NunchakuFluxTransformer2dModel  # make the dependency optional
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +26,14 @@ class ModelInfo:
 
 any = AnyType("*")
 
+# Looking recursively for variable types to flag a non supported error
 UNSUPPORTED_CHK = [
     (
-        ['model', 'diffusion_model', 'model'],
-        "NunchakuFluxTransformer2dModel",
-        "Nunchaku not supported (offloading managed in the binaries).\n"
-        "Disable this offload node, and use the option to enable/disable automatic offloading in the nunchaku loader.",
-    ),
-    (
-        ['diffusion_model', 'model'],
-        "NunchakuFluxTransformer2dModel",
-        "Nunchaku not supported (offloading managed in the binaries).\n"
-        "Disable this offload node, and use the option to enable/disable automatic offloading in the nunchaku loader.",
+        ['model', 'diffusion_model', 'model'],  # variable names to recursively check
+        "NunchakuFluxTransformer2dModel",  # unsupported class name to match
+        "Nunchaku not supported (offloading managed in the binaries).\n"  #  error message 
+        "1) Ignore errors or disable offloading for this node. 2) "
+        "use the option to enable/disable automatic offloading directly the nunchaku loader."  # error resoltion message,
     ),
 ]
 
@@ -67,7 +64,7 @@ class OffloadModel:
     
     RETURN_TYPES = (any, any)
     FUNCTION = "route"
-    CATEGORY = "Unload Model"
+    CATEGORY = "workflow"
     
     def route(self, **kwargs):
         logging.info("Offload Model (node)")
@@ -95,10 +92,18 @@ class OffloadModel:
 
             if torch.device(m_info.device_current) != torch.device(offload_device):
 
-                logging.info(f'- Offload {cls}: move from {torch.device(m_info.device_current)}'
-                      f' to {torch.device(offload_device)}...')
-                m_info.move_func(torch.device(offload_device))
-                logging.info(f'- Offload {cls}: done')
+                if m_info.classname == "GGUFModelPatcher":
+                    logging.info(f'- For GGUFModelPatcher {cls}, offloading  will move all patches to the offload device {torch.device(offload_device)}')
+                    logger.info(f'- Changing the patch_on_device flag to False, overriding the default value from the gguf loader')
+                    model.eject_model()  # eject the unet model to move it
+                    model.unpatch_model()  # unpatch to avoid issues
+                    model.model.to(torch.device(offload_device))
+                else:
+
+                    logging.info(f'- Offload {cls}: move from {torch.device(m_info.device_current)}'
+                        f' to {torch.device(offload_device)}...')
+                    m_info.move_func(torch.device(offload_device))
+                    logging.info(f'- Offload {cls}: done')
 
             # Validate the migration
             m_info_post: ModelInfo = get_model_info(model)
@@ -139,7 +144,7 @@ class RecallModel:
     
     RETURN_TYPES = (any, any)
     FUNCTION = "route"
-    CATEGORY = "Unload Model"
+    CATEGORY = "workflow"
 
     def route(self, **kwargs):
         logging.info("Recall Model (node)")
@@ -173,9 +178,23 @@ class RecallModel:
 
             if torch.device(m_info.device_current) != torch.device(preferred_device):
                 logging.info(f'- Recall {cls} from {torch.device(m_info.device_current)}'
-                      f' to {torch.device(preferred_device)}...')
-                m_info.move_func(torch.device(preferred_device))
-                logging.info(f'- Recalling {cls} done')
+                    f' to {torch.device(preferred_device)}...')
+                if m_info.classname == "GGUFModelPatcher":
+                    logging.info(f'- Overriding GGUFModelPatcher''s default behavior')
+                    model.eject_model()  # eject the unet model to move it
+                    model.unpatch_model()  # unpatch to avoid issues
+                    model.model.to(torch.device(preferred_device))
+                    #model.patch_model()  # reapply patches
+                if m_info.classname == "ModelPatcher":
+                    logging.info(f'- Overriding ModelPatcher''s default behavior')
+                    model.eject_model()  # eject the unet model to move it
+                    model.unpatch_model()  # unpatch to avoid issues
+                    model.model.to(torch.device(preferred_device))
+
+                else:
+
+                    m_info.move_func(torch.device(preferred_device))
+                    logging.info(f'- Recalling {cls} done')
 
             # Validate the migration
             m_info_post: ModelInfo = get_model_info(model)
@@ -186,10 +205,12 @@ class RecallModel:
                       f'model is on {torch.device(m_info_post.device_current)} instead of {torch.device(preferred_device)}')
 
         return (kwargs.get("trigger_value"), kwargs.get("model"),)
+   
+       
 
 def is_supported(model_candidate, on_error: str = "raise") -> Tuple[bool, str]:
     """
-    Return true if the model is supported
+    Return true if the model is known to be unsupported/problematic
     """
     # Eclude unsupported models first
     for nested_obj, class_name, err_msg in UNSUPPORTED_CHK:
@@ -199,24 +220,32 @@ def is_supported(model_candidate, on_error: str = "raise") -> Tuple[bool, str]:
             logging.error(f"- Error: {err_str}")
             if on_error == "raise":
                 raise ValueError(err_str)
-            else:
-                return False, err_str
+            #else:
+            #    return False, err_str
         
+
 
     # Then by default check for supported models
     if type(model_candidate) == ModelPatcher:
         return True, ''
     elif issubclass(type(model_candidate), ModelPatcher):
-        logging.info(f"- model of type {model_candidate.__class__.__name__} might not be supported for Offload/recall")
+        logging.info(f"- model of type {model_candidate.__class__.__name__}, a subclass of ModelPatcher, it might not be supported for Offload/recall")
         return True, ''
     elif hasattr(model_candidate, 'device') and hasattr(model_candidate, 'to'):
         logging.info(f"- Model of type {model_candidate.__class__.__name__} supported (contains 'model.device' and 'model.to()')")
         return True, ''
+    elif hasattr(model_candidate, 'device') and hasattr(model_candidate, 'to'):
+        logging.info(f"- Model of type {model_candidate.__class__.__name__} supported (contains 'model.device' and 'model.to()')")
+        return True, ''  
+    elif issubclass(type(model_candidate), NunchakuFluxTransformer2dModel):
+        logging.info(f"- model of type {model_candidate.__class__.__name__}, a subclass of ModelPatcher, it might not be supported for Offload/recall")
+        return True, ''  
+    
     else:
 
         # If no checks matched, log a warning   
         logging.warning(f"- Warning: No compatible device found for this model {model_candidate.__class__.__name__}.")
-        return False
+        return False, ''
 
 
 def scan_for_models(top_model: object) -> List[object]:
@@ -228,7 +257,8 @@ def scan_for_models(top_model: object) -> List[object]:
         List[object]: the current model if supported and any embedded one (e.g. ModelPatcher contains a model)
     """
     if type(top_model) == ModelPatcher or issubclass(type(top_model), ModelPatcher):
-        return [top_model, top_model.model]
+        #return [top_model, top_model.model]  # modelpatcher takes care of the relocation, accessing the nested model isn't going to solve anything
+        return [top_model]
     elif hasattr(top_model, 'device') and hasattr(top_model, 'to'):
         return [top_model]
     else:
@@ -255,12 +285,19 @@ def get_model_info(model) -> ModelInfo:
     if type(model) == ModelPatcher or issubclass(type(model), ModelPatcher):
         # model patcher
         mp_info = ModelInfo(classname=type(model).__name__,
-                       device_current=model.current_loaded_device(),
+                       device_current=next(model.model.parameters()).device,
                        device_target=model.load_device,
                        device_offload=model.offload_device if hasattr(model, 'offload_device') else None,
-                       move_func=model.model_patches_to)
+                       move_func=model.model.to)
         return mp_info
-
+    elif type(model) == NunchakuFluxTransformer2dModel or issubclass(type(model), ModelPatcher):
+        # model patcher
+        mp_info = ModelInfo(classname=type(model).__name__,
+                       device_current=next(model.model.parameters()).device,
+                       device_target=model.load_device,
+                       device_offload=model.offload_device if hasattr(model, 'offload_device') else None,
+                       move_func=model.model.to)
+        return mp_info
     else:
         m_info = ModelInfo(classname=type(model).__name__,
                        device_current=model.device,

@@ -22,7 +22,7 @@ class RerouteTriggerable:
 
     RETURN_TYPES = (any_type,)
     FUNCTION = "route_triggerable"
-    CATEGORY = "lnk/custom"
+    CATEGORY = "workflow"
 
     def route_triggerable(self, value, **kwargs):
         return (value,)

@@ -15,7 +15,7 @@ class AnyToHash:
     RETURN_NAMES = ('string',)
     OUTPUT_NODE = True
     FUNCTION = "to_md5_hash"
-    CATEGORY = "LNK"
+    CATEGORY = "workflow"
 
     def to_md5_hash(self, anything, unique_id=None, extra_pnginfo=None, **kwargs):
         if anything is None:
@@ -54,7 +54,7 @@ class AnyToHashMulti:
     RETURN_NAMES = ('string',)
     OUTPUT_NODE = True
     FUNCTION = "to_md5_hash_mult"
-    CATEGORY = "LNK"
+    CATEGORY = "workflow"
 
     def to_md5_hash_mult(self, anything1, anything2, unique_id=None, extra_pnginfo=None, **kwargs):
         if anything1 is None or anything2 is None:

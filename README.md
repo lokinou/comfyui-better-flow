@@ -3,7 +3,18 @@
 Nodes for controlling workflow and reducing VRAM fingerprint.
 All assembled for ComfyUI for the goal of making workflows easier and spare computing space. 
 
+***progress***
+- (Model Offload/Recall)
+	- fixed for GGUF flux model by unpatching the model (ModelPatcher and GGUFModelPatcher)
+      - overrides the patch_on_device property
+
+***open topics***
+
 ***TODO: untested release***
+- offload/recall not tested on low_vram and high_vram flags and other models besides flux
+- evtl nunchaku support?
+- Cache any cleanup not working
+
 
 ***TODO: add image use cases for each custom node***
 
@@ -11,11 +22,12 @@ All assembled for ComfyUI for the goal of making workflows easier and spare comp
 
 ### Model offload/ Model recall
 
-Manually offload and reload models between devices (cpu, cuda ...).
-Helps greatly to reduce VRAM usage in complex workflows
+When triggered during runtime, it moves models on their load_device (e.g. cuda) or offload device(e.g. cpu).
+For finer control of VRAM use.
 
-Works with gguf models and .safetensor models.
+Works for flux  via gguf model and .safetensor model, regardless of the low_vram flag (when calling ComfyUI) or the load_on_device property (from GGUFModelPatcher)
 Nunchaku is unsupported/ignored since it mangages its own VRAM usage outside python.
+
 
 ###  Any to Hash
 returns a md5 hash for the input object.
@@ -35,16 +47,22 @@ During the next execution, if a matching key+hash is found in cache, it will Ski
 
 Multiple inputs keys can be used when combined with "any to hash x2" (for example 2 images + 1 prompt)
 
-###  Wait
+Known issue: Tensor type objects seem to produce unreliable hashes. I put a fix for images but some data types must dealt with (e.g. Conditionnings)
+
+### Experimental nodes (not even tested)
+
+####  Wait
 Stops the execution of the workflow until the trigger value has been executed. Due to lazy loading, this specific  node is deprioritized.
 
-### Wait Multi (experimental)
-Wait multiple triggers at once, the node dynamically adds new inputs for each new input connected
+#### Wait Multi (experimental)
+Wait multiple triggers at once, (dynamic number of input?: the node dynamically adds new inputs after new input connected)
 
-### Reroute Triggerable
-Reroute that can be triggered using the advanced Mode>OnTrigger UI elements. For advanced 
+#### Reroute Triggerable
+Reroute that can be triggered using the advanced Mode>OnTrigger UI elements. It enables a leaf node such as "image preview" not not be a leaf anymore if connected.
 
 ## Install
+
+Don't forget to remove the `comfyui-offload-models`, it only workds on the `.safetensor` models.
 
 ### Via ComfyUI
 
@@ -59,7 +77,11 @@ git clone https://github.com/lokinou/comfyui-better-flow.git
 ```
 
 ## versions
-
+- 0.1.2
+	- Model Offload/Recall
+		- fixed for GGUF flux model by unpatching the model (ModelPatcher and GGUFModelPatcher)
+		- ModelPatcher: overrides the patch_on_device property
+	- Hash, Cache Any: images now produce consistent hashes
 - 0.1.1
     - bug fixes
 - 0.1.0

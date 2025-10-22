@@ -10,8 +10,8 @@ WEB_DIRECTORY = "./js"
 # A dictionary that contains all nodes you want to export with their names
 # NOTE: names should be globally unique
 NODE_CLASS_MAPPINGS = {
-    "OffloadModel": OffloadModel,
-    "RecallModel": RecallModel,
+    "OffloadModelv2": OffloadModel,
+    "RecallModelv2": RecallModel,
     "CacheAny": CacheAny,
     "AnyToHash": AnyToHash,
     "AnyToHashMulti": AnyToHashMulti,
@@ -21,8 +21,8 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "OffloadModel": "Model Offload",
-    "RecallModel": "Model Recall",
+    "OffloadModelv2": "Model Offload",
+    "RecallModelv2": "Model Recall",
     "CacheAny": "Cache any",
     "AnyToHash" : "any to hash",
     "AnyToHashMulti" : "any to hash x2",

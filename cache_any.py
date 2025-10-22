@@ -26,7 +26,7 @@ class CacheAny:
     RETURN_TYPES = (any_type, any_type,)
     RETURN_NAMES = ("any_cached", "key_passthrough",)
     FUNCTION = "run_caching"
-    CATEGORY = "LNK"
+    CATEGORY = "workflow"
 
     @classmethod
     def IS_CHANGED(cls, any_to_cache, any_key, cache_name, force_recreate, *args, **kwargs):
