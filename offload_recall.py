@@ -5,7 +5,13 @@ from dataclasses import dataclass
 import torch
 import gc
 import logging
-from nunchaku import NunchakuFluxTransformer2dModel  # make the dependency optional
+
+try:
+    from nunchaku import NunchakuFluxTransformer2dModel
+    NUNCHAKU_AVAILABLE = True
+except ImportError:
+    NUNCHAKU_AVAILABLE = False
+    NunchakuFluxTransformer2dModel = None
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +33,19 @@ class ModelInfo:
 any = AnyType("*")
 
 # Looking recursively for variable types to flag a non supported error
-UNSUPPORTED_CHK = [
-    (
-        ['model', 'diffusion_model', 'model'],  # variable names to recursively check
-        "NunchakuFluxTransformer2dModel",  # unsupported class name to match
-        "Nunchaku not supported (offloading managed in the binaries).\n"  #  error message 
-        "1) Ignore errors or disable offloading for this node. 2) "
-        "use the option to enable/disable automatic offloading directly the nunchaku loader."  # error resoltion message,
-    ),
-]
+UNSUPPORTED_CHK = []
+
+if NUNCHAKU_AVAILABLE:
+    UNSUPPORTED_CHK.append(
+        # each entry is a tuple describing what to check
+        (
+            ['model', 'diffusion_model', 'model'],  # variable names to check (first attribute model, then model.diffusion_model, then model.diffusion_model.model)
+            "NunchakuFluxTransformer2dModel",  # unsupported class name to match
+            "Nunchaku not supported (offloading directly managed in the binaries).\n"  #  error message 
+            "solution: 1) Ignore errors or disable offloading for this node. 2) "
+            "use the option to enable/disable automatic offloading directly the nunchaku loader."  # error resoltion message,
+        ),
+    )
 
 
 device_options = ["auto","cpu"]
@@ -148,6 +158,8 @@ class RecallModel:
 
     def route(self, **kwargs):
         logging.info("Recall Model (node)")
+        check_gc_for_dangling_clones(classname_to_check="GGUFModelPatcher")  # checking for dangling clones
+
         model_candidate = kwargs.get("model")
         cls = model_candidate.__class__.__name__
         if not kwargs.get("enable", True):
@@ -184,12 +196,13 @@ class RecallModel:
                     model.eject_model()  # eject the unet model to move it
                     model.unpatch_model()  # unpatch to avoid issues
                     model.model.to(torch.device(preferred_device))
-                    #model.patch_model()  # reapply patches
+                    model.patch_model()  # reapply patches
                 if m_info.classname == "ModelPatcher":
                     logging.info(f'- Overriding ModelPatcher''s default behavior')
                     model.eject_model()  # eject the unet model to move it
                     model.unpatch_model()  # unpatch to avoid issues
                     model.model.to(torch.device(preferred_device))
+                    model.patch_model()  # reapply patches
 
                 else:
 
@@ -220,8 +233,8 @@ def is_supported(model_candidate, on_error: str = "raise") -> Tuple[bool, str]:
             logging.error(f"- Error: {err_str}")
             if on_error == "raise":
                 raise ValueError(err_str)
-            #else:
-            #    return False, err_str
+            else:
+                return False, err_str
         
 
 
@@ -238,7 +251,7 @@ def is_supported(model_candidate, on_error: str = "raise") -> Tuple[bool, str]:
     elif hasattr(model_candidate, 'device') and hasattr(model_candidate, 'to'):
         logging.info(f"- Model of type {model_candidate.__class__.__name__} supported (contains 'model.device' and 'model.to()')")
         return True, ''  
-    elif issubclass(type(model_candidate), NunchakuFluxTransformer2dModel):
+    elif NUNCHAKU_AVAILABLE and issubclass(type(model_candidate), NunchakuFluxTransformer2dModel):
         logging.info(f"- model of type {model_candidate.__class__.__name__}, a subclass of ModelPatcher, it might not be supported for Offload/recall")
         return True, ''  
     
@@ -283,6 +296,7 @@ def get_model_info(model) -> ModelInfo:
         ModelInfo: info summary about the devices
 
     """
+    
     if type(model) == ModelPatcher or issubclass(type(model), ModelPatcher):
         # model patcher
         mp_info = ModelInfo(classname=type(model).__name__,
@@ -291,7 +305,7 @@ def get_model_info(model) -> ModelInfo:
                        device_offload=model.offload_device if hasattr(model, 'offload_device') else None,
                        move_func=model.model.to)
         return mp_info
-    elif type(model) == NunchakuFluxTransformer2dModel or issubclass(type(model), ModelPatcher):
+    elif NUNCHAKU_AVAILABLE and type(model) == NunchakuFluxTransformer2dModel:
         # model patcher
         mp_info = ModelInfo(classname=type(model).__name__,
                        device_current=next(model.model.parameters()).device,
@@ -306,3 +320,50 @@ def get_model_info(model) -> ModelInfo:
                        device_offload=model.offload_device if hasattr(model, 'offload_device') else None,
                        move_func=model.to)
         return m_info
+    
+
+def check_gc_for_dangling_clones(classname_to_check = "GGUFModelPatcher") -> None:
+    """
+    Check for dangling clones in the garbage collector.
+    This is useful to identify models that may not have been properly offloaded.
+    """
+    # --- START DEBUGGING CODE ---
+    logging.info(f"Checking garbage collector for dangling clones of type {classname_to_check}...")
+    gc.collect()  # Force a garbage collection run
+
+    # Find all ModelPatcher objects the GC knows about
+    type_instances = []
+    for obj in gc.get_objects():
+        if type(obj).__name__ ==  classname_to_check:
+            type_instances.append(obj)
+
+    logging.info(f"Found {len(type_instances)} {classname_to_check} instances in memory.")
+
+    # If we have more than one, it's suspicious. Let's inspect them.
+    if len(type_instances) > 1:
+        logging.warning(f"Potential leak! Expected 1 {classname_to_check}, found {len(type_instances)}.")
+
+        for i, patcher in enumerate(type_instances):
+            logging.info(f"--- Instance {i} (id: {id(patcher)}) ---")
+
+            # Get the list of objects referring to this patcher
+            referrers = gc.get_referrers(patcher)
+            logging.info(f"Found {len(referrers)} referrers.")
+
+            # Try to print some useful info about the referrers
+            for ref in referrers:
+                # Avoid printing the huge list of all objects
+                if isinstance(ref, list) and len(ref) > 100: 
+                    logging.info(f"  -> Referenced by a large list (len: {len(ref)})")
+                # Avoid printing massive dictionaries
+                elif isinstance(ref, dict) and len(ref) > 100:
+                    logging.info(f"  -> Referenced by a large dict (keys: {list(ref.keys())[:5]}...)")
+                # This is the most common culprit!
+                elif 'execution' in str(type(ref)):
+                     logging.info(f"  -> CRITICAL: Referenced by an execution frame or cache: {type(ref)}")
+                else:
+                    # Print a snippet of the referrer
+                    logging.info(f"  -> Referenced by: {str(ref)[:150]}")
+
+    logging.info("!!! FINISHED CLONE CHECK !!!")
+    # --- END DEBUGGING CODE ---
