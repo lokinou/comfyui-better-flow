@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-better-flow"
 description = "Nodes for controlling workflow and reducing VRAM fingerprint."
-version = "0.1.2"
+version = "0.1.3"
 license = { text = "MIT License" }
 dependencies = []
 

@@ -95,6 +95,9 @@ git clone https://github.com/lokinou/comfyui-better-flow.git
 ```
 
 ## versions
+- 0.1.3
+	- Model Offload/Recall
+		- handling of failed Nunchaku import
 - 0.1.2
 	- Model Offload/Recall
 		- fixed for GGUF flux model by unpatching the model (ModelPatcher and GGUFModelPatcher)
